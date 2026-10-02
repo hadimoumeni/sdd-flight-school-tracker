@@ -14,8 +14,7 @@ def get_connection():
     return conn
 
 
-def init_db():
-    conn = get_connection()
+def init_schema(conn):
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,4 +57,9 @@ def init_db():
         );
     """)
     conn.commit()
+
+
+def init_db():
+    conn = get_connection()
+    init_schema(conn)
     conn.close()
