@@ -25,3 +25,23 @@ def aircraft_id(conn):
     )
     conn.commit()
     return cur.lastrowid
+
+
+@pytest.fixture
+def student_id(conn):
+    cur = conn.execute(
+        "INSERT INTO students (name, email) VALUES (?, ?)",
+        ("Alex Rivera", "alex@example.com"),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+@pytest.fixture
+def instructor_id(conn):
+    cur = conn.execute(
+        "INSERT INTO instructors (name, email, certificate_number) VALUES (?, ?, ?)",
+        ("Jordan Lee", "jordan@example.com", "CFI-4821"),
+    )
+    conn.commit()
+    return cur.lastrowid
