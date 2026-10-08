@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flight School Ops</title>
+  <style>
+    body { font-family: sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    nav { margin-bottom: 1.5rem; }
+    nav a { margin-right: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.4rem; border-bottom: 1px solid #ddd; }
+    .ok { color: #1a7a33; font-weight: bold; }
+    .grounded { color: #b3261e; font-weight: bold; }
+    form.inline { display: inline; }
+    .flash { background: #fff3cd; border: 1px solid #ffeeba; padding: 0.5rem 1rem; margin-bottom: 1rem; }
+    fieldset { margin-bottom: 1.5rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="{{ url_for('scheduling.index') }}">Scheduling</a>
+    <a href="{{ url_for('maintenance.index') }}">Maintenance</a>
+  </nav>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="flash">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</body>
+</html>

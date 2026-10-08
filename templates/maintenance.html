@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Aircraft</h1>
+  <table>
+    <tr><th>Tail #</th><th>Model</th><th>Total hrs</th><th>Since inspection</th><th>Status</th></tr>
+    {% for a in aircraft %}
+      <tr>
+        <td>{{ a.tail_number }}</td>
+        <td>{{ a.model }}</td>
+        <td>{{ a.total_hours }}</td>
+        <td>{{ a.total_hours - a.hours_at_last_inspection }}</td>
+        <td>
+          {% if a.airworthy %}
+            <span class="ok">airworthy</span>
+          {% else %}
+            <span class="grounded">{{ a.reason }}</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <fieldset>
+    <legend>Add aircraft</legend>
+    <form method="post" action="{{ url_for('maintenance.create_aircraft') }}">
+      <input name="tail_number" placeholder="Tail number" required>
+      <input name="model" placeholder="Model" required>
+      <button type="submit">Add</button>
+    </form>
+  </fieldset>
+
+  <fieldset>
+    <legend>Report a squawk</legend>
+    <form method="post" action="{{ url_for('maintenance.report_squawk') }}">
+      <select name="aircraft_id" required>
+        {% for a in aircraft %}
+          <option value="{{ a.id }}">{{ a.tail_number }}</option>
+        {% endfor %}
+      </select>
+      <input name="description" placeholder="What's wrong" required>
+      <select name="severity">
+        <option value="minor">minor</option>
+        <option value="safety">safety</option>
+      </select>
+      <button type="submit">Report</button>
+    </form>
+  </fieldset>
+
+  <h2>Open squawks</h2>
+  <table>
+    <tr><th>Aircraft</th><th>Description</th><th>Severity</th><th>Reported</th><th></th></tr>
+    {% for s in squawks %}
+      <tr>
+        <td>{{ s.tail_number }}</td>
+        <td>{{ s.description }}</td>
+        <td>{{ s.severity }}</td>
+        <td>{{ s.reported_at }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ url_for('maintenance.resolve_squawk', squawk_id=s.id) }}">
+            <button type="submit">Resolve</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
