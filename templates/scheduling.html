@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Lessons</h1>
+  <table>
+    <tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Start</th><th>End</th><th>Status</th></tr>
+    {% for l in lessons %}
+      <tr>
+        <td>{{ l.student_name }}</td>
+        <td>{{ l.instructor_name }}</td>
+        <td>{{ l.tail_number }}</td>
+        <td>{{ l.start_time }}</td>
+        <td>{{ l.end_time }}</td>
+        <td>{{ l.status }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <fieldset>
+    <legend>Book a lesson</legend>
+    <form method="post" action="{{ url_for('scheduling.create_lesson') }}">
+      <select name="student_id" required>
+        {% for s in students %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+      </select>
+      <select name="instructor_id" required>
+        {% for i in instructors %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
+      </select>
+      <select name="aircraft_id" required>
+        {% for a in aircraft %}<option value="{{ a.id }}">{{ a.tail_number }}</option>{% endfor %}
+      </select>
+      <input type="datetime-local" name="start_time" required>
+      <input type="datetime-local" name="end_time" required>
+      <button type="submit">Book</button>
+    </form>
+  </fieldset>
+
+  <fieldset>
+    <legend>Add student</legend>
+    <form method="post" action="{{ url_for('scheduling.create_student') }}">
+      <input name="name" placeholder="Name" required>
+      <input name="email" placeholder="Email" required>
+      <button type="submit">Add</button>
+    </form>
+  </fieldset>
+
+  <fieldset>
+    <legend>Add instructor</legend>
+    <form method="post" action="{{ url_for('scheduling.create_instructor') }}">
+      <input name="name" placeholder="Name" required>
+      <input name="email" placeholder="Email" required>
+      <input name="certificate_number" placeholder="Certificate #" required>
+      <button type="submit">Add</button>
+    </form>
+  </fieldset>
+{% endblock %}
