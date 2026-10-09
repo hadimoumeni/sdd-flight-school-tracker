@@ -19,11 +19,15 @@ created under `./data` (set `DATA_DIR` to override).
 ## Tests
 
 ```
-python -m pytest --cov=domains --cov-report=term-missing
+python -m pytest --cov=domains.maintenance.service --cov=domains.scheduling.service --cov-report=term-missing
 ```
 
-12 tests, 100% coverage on `domains/` (the scheduling and maintenance
-business logic — the two feature domains required by the assignment).
+12 tests, 100% coverage on the two domains' business logic
+(`domains/*/service.py`). Routes (`domains/*/routes.py`) are intentionally
+excluded from the coverage target: they're Flask glue (read a form, call the
+service, redirect), which is what the assignment's testing section says not
+to chase coverage on. They were verified by hand by running the app and
+exercising every route over real HTTP.
 
 ## Architecture
 
