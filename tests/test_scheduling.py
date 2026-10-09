@@ -72,3 +72,12 @@ def test_booking_a_grounded_aircraft_is_rejected(conn, student_id, instructor_id
         book_lesson(
             conn, student_id, instructor_id, aircraft_id, "2026-10-05 09:00", "2026-10-05 10:00"
         )
+
+
+def test_booking_with_end_time_before_start_time_is_rejected(
+    conn, student_id, instructor_id, aircraft_id
+):
+    with pytest.raises(ValueError, match="end time must be after start time"):
+        book_lesson(
+            conn, student_id, instructor_id, aircraft_id, "2026-10-05 10:00", "2026-10-05 09:00"
+        )

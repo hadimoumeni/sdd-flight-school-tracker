@@ -10,6 +10,9 @@ def book_lesson(conn, student_id, instructor_id, aircraft_id, start_time, end_ti
     Book a lesson if the instructor and aircraft are free and the aircraft
     is airworthy. Returns the new lesson id, or raises ValueError.
     """
+    if end_time <= start_time:
+        raise ValueError("end time must be after start time")
+
     airworthy, reason = is_airworthy(conn, aircraft_id)
     if not airworthy:
         raise ValueError(reason)
