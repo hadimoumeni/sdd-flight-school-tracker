@@ -29,3 +29,11 @@ Context: The assignment asks for ≥70% coverage on core business logic, explici
 Decision: `domains/*/service.py` is unit-tested against an in-memory SQLite connection, built test-first (TDD): write the test, watch it fail, then write the minimum code to pass. `domains/*/routes.py` has no automated tests; each route was exercised once by hand over real HTTP (create student/instructor/aircraft, book a lesson, report a squawk, confirm a grounded aircraft rejects a booking) before being committed.
 Alternatives considered: Using Flask's test client to write route-level tests too, for a higher overall coverage number. Rejected for now — it would mostly re-test the same conflict/grounding logic through an extra HTTP layer, for coverage on code the assignment doesn't grade.
 Consequences: `pytest --cov=domains.maintenance.service --cov=domains.scheduling.service` reports 100%, honestly scoped to the code that's actually graded. If a route grows real logic of its own later, that logic should move into a service function and get the same test treatment — not stay untested in the route.
+
+## 5. No login/authentication
+Date: 2026-10-11
+Status: Decided
+Context: The stakeholder is a small flight school with one shared front-desk terminal and no public-facing users; §1b lists auth as a free choice to justify either way.
+Decision: No login, no sessions, no user accounts. Every route is reachable by anyone who can open the app, the same as a shared terminal at a front desk.
+Alternatives considered: Role-based auth (student/instructor/admin), which was the original design-phase idea. Rejected for this submission: it adds real surface (password storage, session handling, route guards) that has nothing to do with the two required feature domains, and risked eating the time budget needed for the scheduling/maintenance logic and its tests.
+Consequences: Anyone with the URL can book lessons, add aircraft, or resolve squawks — fine for a single trusted terminal, not fine if this were ever exposed beyond that. Adding auth later means wrapping existing routes in a guard decorator, not restructuring the domains themselves.
