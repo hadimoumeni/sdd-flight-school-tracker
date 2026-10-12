@@ -75,3 +75,14 @@ def create_lesson():
         flash(str(exc))
     conn.close()
     return redirect(url_for("scheduling.index"))
+
+
+@bp.route("/lessons/<int:lesson_id>/complete", methods=["POST"])
+def complete_lesson(lesson_id):
+    conn = get_connection()
+    try:
+        service.complete_lesson(conn, lesson_id)
+    except ValueError as exc:
+        flash(str(exc))
+    conn.close()
+    return redirect(url_for("scheduling.index"))

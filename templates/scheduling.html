@@ -2,7 +2,7 @@
 {% block content %}
   <h1>Lessons</h1>
   <table>
-    <tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Start</th><th>End</th><th>Status</th></tr>
+    <tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Start</th><th>End</th><th>Status</th><th></th></tr>
     {% for l in lessons %}
       <tr>
         <td>{{ l.student_name }}</td>
@@ -11,6 +11,14 @@
         <td>{{ l.start_time }}</td>
         <td>{{ l.end_time }}</td>
         <td>{{ l.status }}</td>
+        <td>
+          {% if l.status == "scheduled" %}
+            <form class="inline" method="post"
+                  action="{{ url_for('scheduling.complete_lesson', lesson_id=l.id) }}">
+              <button type="submit">Mark complete</button>
+            </form>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
   </table>

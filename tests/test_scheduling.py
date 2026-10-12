@@ -1,6 +1,11 @@
 import pytest
 
-from domains.scheduling.service import book_lesson, create_instructor, create_student
+from domains.scheduling.service import (
+    book_lesson,
+    complete_lesson,
+    create_instructor,
+    create_student,
+)
 
 
 def test_book_lesson_succeeds_for_available_slot(conn, student_id, instructor_id, aircraft_id):
@@ -109,3 +114,38 @@ def test_create_instructor_with_valid_email_succeeds(conn):
     ).fetchone()
     assert row["name"] == "Jordan Lee"
     assert row["certificate_number"] == "CFI-4821"
+
+
+def test_completing_a_lesson_logs_flight_hours_and_marks_it_completed(
+    conn, student_id, instructor_id, aircraft_id
+):
+    lesson_id = book_lesson(
+        conn, student_id, instructor_id, aircraft_id, "2026-10-05 09:00", "2026-10-05 11:00"
+    )
+
+    complete_lesson(conn, lesson_id)
+
+    lesson = conn.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+    assert lesson["status"] == "completed"
+
+    aircraft = conn.execute(
+        "SELECT total_hours FROM aircraft WHERE id = ?", (aircraft_id,)
+    ).fetchone()
+    assert aircraft["total_hours"] == 2.0
+
+
+def test_completing_an_already_completed_lesson_is_rejected(
+    conn, student_id, instructor_id, aircraft_id
+):
+    lesson_id = book_lesson(
+        conn, student_id, instructor_id, aircraft_id, "2026-10-05 09:00", "2026-10-05 10:00"
+    )
+    complete_lesson(conn, lesson_id)
+
+    with pytest.raises(ValueError, match="not scheduled"):
+        complete_lesson(conn, lesson_id)
+
+
+def test_completing_a_nonexistent_lesson_is_rejected(conn):
+    with pytest.raises(ValueError, match="not scheduled"):
+        complete_lesson(conn, 9999)

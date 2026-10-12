@@ -1,4 +1,6 @@
-from domains.maintenance.service import is_airworthy
+from datetime import datetime
+
+from domains.maintenance.service import is_airworthy, log_flight_hours
 
 
 def _overlaps(start_a, end_a, start_b, end_b):
@@ -64,3 +66,26 @@ def book_lesson(conn, student_id, instructor_id, aircraft_id, start_time, end_ti
     )
     conn.commit()
     return cur.lastrowid
+
+
+def complete_lesson(conn, lesson_id):
+    """
+    Mark a scheduled lesson completed and log its duration as flight hours
+    against the aircraft it used. Raises ValueError if the lesson doesn't
+    exist or isn't currently scheduled.
+    """
+    lesson = conn.execute(
+        "SELECT aircraft_id, start_time, end_time, status FROM lessons WHERE id = ?",
+        (lesson_id,),
+    ).fetchone()
+
+    if lesson is None or lesson["status"] != "scheduled":
+        raise ValueError("lesson is not scheduled")
+
+    start = datetime.fromisoformat(lesson["start_time"])
+    end = datetime.fromisoformat(lesson["end_time"])
+    duration_hours = (end - start).total_seconds() / 3600
+
+    conn.execute("UPDATE lessons SET status = 'completed' WHERE id = ?", (lesson_id,))
+    conn.commit()
+    log_flight_hours(conn, lesson["aircraft_id"], duration_hours)
