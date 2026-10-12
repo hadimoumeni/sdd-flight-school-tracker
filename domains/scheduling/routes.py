@@ -1,7 +1,7 @@
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from db import get_connection
-from domains.scheduling.service import book_lesson
+from domains.scheduling import service
 
 bp = Blueprint("scheduling", __name__, url_prefix="/scheduling")
 
@@ -35,11 +35,10 @@ def index():
 @bp.route("/students", methods=["POST"])
 def create_student():
     conn = get_connection()
-    conn.execute(
-        "INSERT INTO students (name, email) VALUES (?, ?)",
-        (request.form["name"], request.form["email"]),
-    )
-    conn.commit()
+    try:
+        service.create_student(conn, request.form["name"], request.form["email"])
+    except ValueError as exc:
+        flash(str(exc))
     conn.close()
     return redirect(url_for("scheduling.index"))
 
@@ -47,11 +46,15 @@ def create_student():
 @bp.route("/instructors", methods=["POST"])
 def create_instructor():
     conn = get_connection()
-    conn.execute(
-        "INSERT INTO instructors (name, email, certificate_number) VALUES (?, ?, ?)",
-        (request.form["name"], request.form["email"], request.form["certificate_number"]),
-    )
-    conn.commit()
+    try:
+        service.create_instructor(
+            conn,
+            request.form["name"],
+            request.form["email"],
+            request.form["certificate_number"],
+        )
+    except ValueError as exc:
+        flash(str(exc))
     conn.close()
     return redirect(url_for("scheduling.index"))
 
@@ -60,7 +63,7 @@ def create_instructor():
 def create_lesson():
     conn = get_connection()
     try:
-        book_lesson(
+        service.book_lesson(
             conn,
             request.form["student_id"],
             request.form["instructor_id"],

@@ -1,6 +1,6 @@
 import pytest
 
-from domains.scheduling.service import book_lesson
+from domains.scheduling.service import book_lesson, create_instructor, create_student
 
 
 def test_book_lesson_succeeds_for_available_slot(conn, student_id, instructor_id, aircraft_id):
@@ -81,3 +81,31 @@ def test_booking_with_end_time_before_start_time_is_rejected(
         book_lesson(
             conn, student_id, instructor_id, aircraft_id, "2026-10-05 10:00", "2026-10-05 09:00"
         )
+
+
+def test_create_student_with_valid_email_succeeds(conn):
+    student_id = create_student(conn, "Alex Rivera", "alex@example.com")
+
+    row = conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone()
+    assert row["name"] == "Alex Rivera"
+    assert row["email"] == "alex@example.com"
+
+
+def test_create_student_with_invalid_email_is_rejected(conn):
+    with pytest.raises(ValueError, match="invalid email"):
+        create_student(conn, "Alex Rivera", "not-an-email")
+
+
+def test_create_instructor_with_invalid_email_is_rejected(conn):
+    with pytest.raises(ValueError, match="invalid email"):
+        create_instructor(conn, "Jordan Lee", "not-an-email", "CFI-4821")
+
+
+def test_create_instructor_with_valid_email_succeeds(conn):
+    instructor_id = create_instructor(conn, "Jordan Lee", "jordan@example.com", "CFI-4821")
+
+    row = conn.execute(
+        "SELECT * FROM instructors WHERE id = ?", (instructor_id,)
+    ).fetchone()
+    assert row["name"] == "Jordan Lee"
+    assert row["certificate_number"] == "CFI-4821"

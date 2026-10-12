@@ -5,6 +5,32 @@ def _overlaps(start_a, end_a, start_b, end_b):
     return start_a < end_b and start_b < end_a
 
 
+def _is_valid_email(email):
+    if not email or "@" not in email:
+        return False
+    local, _, domain = email.partition("@")
+    return bool(local) and "." in domain
+
+
+def create_student(conn, name, email):
+    if not _is_valid_email(email):
+        raise ValueError("invalid email")
+    cur = conn.execute("INSERT INTO students (name, email) VALUES (?, ?)", (name, email))
+    conn.commit()
+    return cur.lastrowid
+
+
+def create_instructor(conn, name, email, certificate_number):
+    if not _is_valid_email(email):
+        raise ValueError("invalid email")
+    cur = conn.execute(
+        "INSERT INTO instructors (name, email, certificate_number) VALUES (?, ?, ?)",
+        (name, email, certificate_number),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
 def book_lesson(conn, student_id, instructor_id, aircraft_id, start_time, end_time):
     """
     Book a lesson if the instructor and aircraft are free and the aircraft
