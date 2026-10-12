@@ -130,9 +130,13 @@ app skeleton to the Azure deployment contract in §7; test-driving the
 maintenance domain's airworthiness rules and the scheduling domain's
 booking/conflict logic; wiring both domains to Flask routes and Jinja2
 templates; fixing a stale coverage claim once routes existed; test-driving
-a missed edge case (booking with `end_time` before `start_time`); and
-drafting the `ADR.md` and `AI_USAGE.md` entries documenting each of the
-decisions above as they were made. The output of these prompts was used to
+a missed edge case (booking with `end_time` before `start_time`); adding
+email validation on student/instructor creation; test-driving
+`complete_lesson`, which logs flight hours against an aircraft and was the
+missing link between a booked lesson and the 100-hour inspection rule ever
+actually triggering; and drafting the `ADR.md` and `AI_USAGE.md` entries
+documenting each of the decisions above as they were made. The output of
+these prompts was used to
 write the production code, tests, and process documentation in this
 repository, verified by running the test suite and by exercising every
 route over real HTTP before each commit. The detailed, per-commit log of
