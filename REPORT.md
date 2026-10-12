@@ -51,16 +51,20 @@ graph TD
     App --> MaintRoutes["domains/maintenance/routes.py"]
     SchedRoutes --> SchedService["domains/scheduling/service.py<br/>book_lesson()"]
     MaintRoutes --> MaintService["domains/maintenance/service.py<br/>is_airworthy()<br/>log_flight_hours()"]
-    SchedService -->|"the only call across domains"| MaintService
+    SchedService -.->|"SEAM — cut here for Assignment 2"| MaintService
     SchedService --> DB[("SQLite<br/>db.py")]
     MaintService --> DB
 ```
 
-The arrow from `SchedService` to `MaintService` is deliberately the only
-line crossing the domain boundary (`ADR.md` entry 2): scheduling asks
+The dashed arrow from `SchedService` to `MaintService` is deliberately the
+**only** line crossing the domain boundary (`ADR.md` entry 2), and it's
+where Assignment 2 would cut this into two services: scheduling asks
 maintenance "is this aircraft airworthy?" through `is_airworthy(conn,
-aircraft_id)` and never reads the `aircraft`/`squawks` tables itself. That
-function call is the seam a future split into two services would cut along.
+aircraft_id)`, and tells it "this many hours were just flown" through
+`log_flight_hours(conn, aircraft_id, hours)` — never reading or writing the
+`aircraft`/`squawks` tables itself. That function pair becomes the one
+HTTP call (or message) between two services; everything else in each
+domain stays exactly as it is.
 
 ## 3. Database schema
 
@@ -126,7 +130,7 @@ both domains' business logic as of this report).
 
 I acknowledge the use of Claude Code (Anthropic) to design, implement, test,
 and document this project. The prompts used include: scaffolding the Flask
-app skeleton to the Azure deployment contract in §7; test-driving the
+app skeleton to the local container contract in §7; test-driving the
 maintenance domain's airworthiness rules and the scheduling domain's
 booking/conflict logic; wiring both domains to Flask routes and Jinja2
 templates; fixing a stale coverage claim once routes existed; test-driving

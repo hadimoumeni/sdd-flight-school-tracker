@@ -6,6 +6,8 @@ legal to fly (100-hour inspection cycle, pilot-reported squawks).
 
 ## Setup
 
+### Directly on a machine
+
 ```
 python3 -m venv venv
 source venv/bin/activate
@@ -13,8 +15,54 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Runs on port 5000 by default (set `PORT` to override). SQLite database is
-created under `./data` (set `DATA_DIR` to override).
+### With Docker
+
+```
+docker build -t flight-school-ops .
+docker run -p 8000:8000 -v flight-school-data:/data flight-school-ops
+```
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8000` | Port the app listens on. |
+| `DATA_DIR` | `./data` locally, `/data` in the container | Directory holding the SQLite file (`flight_school.db`). |
+| `SECRET_KEY` | `dev-secret-key` | Flask session/flash-message signing key. |
+
+No seed data: every table (students, instructors, aircraft, lessons,
+squawks) is populated through the app's own forms, not reference data that
+needs loading on first boot — so there's nothing to ship as a `seed.sql`
+and no first-boot loading logic to make idempotent.
+
+### §7 container-run evidence
+
+```
+=== SDD Assignment 1 contract check ===
+Repository: /Users/hadimoumeni/Downloads/sdd-flight-school-tracker
+
+==> Repository shape
+  PASS  one Dockerfile, one manifest (requirements.txt)
+
+==> Build from a clean context, no build args
+  PASS  image built
+  PASS  image size 53 MB
+
+==> Start on PORT=8000 and reach it from the host
+  PASS  HTTP 302 from http://localhost:8000/
+
+==> SQLite file under DATA_DIR
+  PASS  found in /data: flight_school.db
+
+==> Data persists, and a second boot does not re-seed
+  PASS  volume at /data persists
+  PASS  row counts unchanged across restart: aircraft=0 instructors=0 lessons=0 squawks=0 students=0
+
+==> PORT override is honoured (not hardcoded)
+  PASS  HTTP 302 from http://localhost:9123/
+
+=== ALL CHECKS PASSED ===
+```
 
 ## Tests
 
