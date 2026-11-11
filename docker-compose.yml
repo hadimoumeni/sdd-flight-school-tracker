@@ -1,0 +1,76 @@
+# Local development: the whole system with one command.
+#   docker compose up --build
+#   maintenance: http://localhost:8001/health
+#   scheduling:  http://localhost:8002/health
+#
+# The passwords below are throwaway defaults for a SQL Server container that
+# only runs on your machine. Override them in a .env file (gitignored).
+# Real (Azure) passwords live only in GitHub Actions secrets.
+
+x-sql-env: &sql-env
+  ACCEPT_EULA: "Y"
+  MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-LocalOnly_Sa_123}
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64 # Apple Silicon: enable Rosetta emulation in Docker Desktop
+    environment: *sql-env
+    volumes:
+      - sqldata:/var/opt/mssql # data survives `docker compose down` (not `down -v`)
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # One-off: creates the two databases and the two logins, then exits.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      <<: *sql-env
+      MAINTENANCE_DB_PASSWORD: ${MAINTENANCE_DB_PASSWORD:-LocalOnly_Maint_123}
+      SCHEDULING_DB_PASSWORD: ${SCHEDULING_DB_PASSWORD:-LocalOnly_Sched_123}
+    volumes:
+      - ./db/init.sql:/init.sql:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - >-
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "$$MSSQL_SA_PASSWORD" -C -b
+        -i /init.sql
+        -v MAINTENANCE_DB_PASSWORD="$$MAINTENANCE_DB_PASSWORD"
+        SCHEDULING_DB_PASSWORD="$$SCHEDULING_DB_PASSWORD"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: "no"
+
+  maintenance:
+    build: ./services/maintenance
+    environment:
+      DATABASE_URL: mssql+pymssql://maintenance_user:${MAINTENANCE_DB_PASSWORD:-LocalOnly_Maint_123}@sqlserver:1433/maintenance
+      CORS_ORIGIN: http://localhost:8080
+    ports:
+      - "8001:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+  scheduling:
+    build: ./services/scheduling
+    environment:
+      DATABASE_URL: mssql+pymssql://scheduling_user:${SCHEDULING_DB_PASSWORD:-LocalOnly_Sched_123}@sqlserver:1433/scheduling
+      CORS_ORIGIN: http://localhost:8080
+      MAINTENANCE_URL: http://maintenance:8000
+      MAINTENANCE_TIMEOUT_S: "2"
+    ports:
+      - "8002:8000"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  sqldata:
