@@ -1,0 +1,10 @@
+# Only what the Dockerfile copies is needed; keep everything else out of the build context.
+tests/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.coverage
+.env
+*.pyc
