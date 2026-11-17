@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+# Coverage is measured on the business rules (logic.py), not on routes or SQL.
+addopts = "--cov=logic --cov-report=term-missing --cov-fail-under=70"
