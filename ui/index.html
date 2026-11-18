@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight School Ops</title>
+  <style>
+    body { font-family: sans-serif; max-width: 860px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    nav { margin-bottom: 1rem; }
+    nav a { margin-right: 1rem; }
+    nav a.active { font-weight: bold; }
+    #health { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th, td { text-align: left; padding: 0.4rem; border-bottom: 1px solid #ddd; }
+    .ok { color: #1a7a33; font-weight: bold; }
+    .grounded, .down { color: #b3261e; font-weight: bold; }
+    .flash { background: #fff3cd; border: 1px solid #ffeeba; padding: 0.5rem 1rem; margin-bottom: 1rem; }
+    .flash.error { background: #f8d7da; border-color: #f5c2c7; }
+    fieldset { margin-bottom: 1.5rem; }
+    input, select, button { margin: 0.15rem 0; }
+    .note { color: #666; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#scheduling" id="nav-scheduling">Scheduling</a>
+    <a href="#maintenance" id="nav-maintenance">Maintenance</a>
+  </nav>
+  <div id="health">Checking services…</div>
+  <div id="messages"></div>
+
+  <section id="scheduling" hidden>
+    <h1>Lessons</h1>
+    <p id="aircraft-notice" class="note" hidden></p>
+    <table>
+      <thead>
+        <tr><th>Student</th><th>Instructor</th><th>Aircraft</th><th>Start</th><th>End</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody id="lesson-rows"></tbody>
+    </table>
+
+    <fieldset>
+      <legend>Book a lesson</legend>
+      <form id="book-form">
+        <select name="student_id" id="student-select" required></select>
+        <select name="instructor_id" id="instructor-select" required></select>
+        <select name="aircraft_id" id="aircraft-select" required></select>
+        <input type="datetime-local" name="start_time" required>
+        <input type="datetime-local" name="end_time" required>
+        <button type="submit">Book</button>
+      </form>
+    </fieldset>
+
+    <fieldset>
+      <legend>Add student</legend>
+      <form id="student-form">
+        <input name="name" placeholder="Name" required>
+        <input name="email" type="email" placeholder="Email" required>
+        <button type="submit">Add</button>
+      </form>
+    </fieldset>
+
+    <fieldset>
+      <legend>Add instructor</legend>
+      <form id="instructor-form">
+        <input name="name" placeholder="Name" required>
+        <input name="email" type="email" placeholder="Email" required>
+        <input name="certificate_number" placeholder="Certificate #" required>
+        <button type="submit">Add</button>
+      </form>
+    </fieldset>
+  </section>
+
+  <section id="maintenance" hidden>
+    <h1>Aircraft</h1>
+    <table>
+      <thead>
+        <tr><th>Tail #</th><th>Model</th><th>Total hrs</th><th>Since inspection</th><th>Status</th></tr>
+      </thead>
+      <tbody id="aircraft-rows"></tbody>
+    </table>
+
+    <fieldset>
+      <legend>Add aircraft</legend>
+      <form id="aircraft-form">
+        <input name="tail_number" placeholder="Tail number" required>
+        <input name="model" placeholder="Model" required>
+        <button type="submit">Add</button>
+      </form>
+    </fieldset>
+
+    <fieldset>
+      <legend>Report a squawk</legend>
+      <form id="squawk-form">
+        <select name="aircraft_id" id="squawk-aircraft-select" required></select>
+        <input name="description" placeholder="What's wrong" required>
+        <select name="severity">
+          <option value="minor">minor</option>
+          <option value="safety">safety</option>
+        </select>
+        <button type="submit">Report</button>
+      </form>
+    </fieldset>
+
+    <h2>Open squawks</h2>
+    <table>
+      <thead>
+        <tr><th>Aircraft</th><th>Description</th><th>Severity</th><th>Reported</th><th></th></tr>
+      </thead>
+      <tbody id="squawk-rows"></tbody>
+    </table>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

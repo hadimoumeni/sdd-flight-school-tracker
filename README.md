@@ -19,6 +19,13 @@ Scheduling calls maintenance over HTTP (2 s timeout) when a lesson is booked
 (`POST /aircraft/{id}/flight-hours`). If maintenance is down, scheduling keeps
 serving its own data and those two actions return `503` with a clear message.
 
+The UI (`ui/`) is static HTML and JavaScript. The browser calls both services
+directly; their base URLs come from `ui/config.js` (local values in the repo,
+overwritten with the Azure URLs at deploy time). Locally, compose serves `ui/`
+with a stock `nginx:alpine` image. If a service is down or still starting, the
+page shows "starting up or unavailable" with a Retry button, and every call
+gives up after 15 s instead of hanging.
+
 Each service is split into `app.py` (HTTP routes), `logic.py` (business rules,
 no database or HTTP), `store.py` (SQL) and `db.py` (connection and migrations).
 
@@ -31,6 +38,7 @@ Requires Docker. On Apple Silicon, enable Rosetta emulation in Docker Desktop
 docker compose up --build
 ```
 
+- UI: http://localhost:8080
 - maintenance: http://localhost:8001/health
 - scheduling: http://localhost:8002/health
 
@@ -40,8 +48,10 @@ database and applies its migrations (`services/<name>/migrations/*.sql`) on
 startup. Data is kept in the `sqldata` volume; `docker compose down -v`
 deletes it.
 
-Partial failure check: `docker compose stop maintenance`, then
-`curl localhost:8002/health` still returns 200.
+Partial failure check: `docker compose stop maintenance`, then open the UI.
+Lessons, students and instructors still load; tail numbers show as
+"aircraft #N" and booking returns a clear "maintenance service is
+unavailable" message. Screenshots are in `docs/evidence/`.
 
 ## Run one service on its own
 
