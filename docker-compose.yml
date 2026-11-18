@@ -2,6 +2,7 @@
 #   docker compose up --build
 #   maintenance: http://localhost:8001/health
 #   scheduling:  http://localhost:8002/health
+#   UI:          http://localhost:8080
 #
 # The passwords below are throwaway defaults for a SQL Server container that
 # only runs on your machine. Override them in a .env file (gitignored).
@@ -71,6 +72,15 @@ services:
     depends_on:
       db-init:
         condition: service_completed_successfully
+
+  # The static UI, served by a stock nginx image (no Dockerfile, not a service container).
+  # The browser calls both services directly, using the URLs in ui/config.js.
+  ui:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./ui:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
 
 volumes:
   sqldata:
