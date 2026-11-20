@@ -199,7 +199,7 @@ async function renderScheduling() {
         tailNumbers.get(lesson.aircraft_id) ?? `aircraft #${lesson.aircraft_id}`,
         showTime(lesson.start_time),
         showTime(lesson.end_time),
-        lesson.status,
+        lesson.completed_at ? `completed ${showTime(lesson.completed_at)}` : lesson.status,
         action,
       );
     }),

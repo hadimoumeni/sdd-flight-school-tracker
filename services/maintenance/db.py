@@ -6,6 +6,7 @@ database, then applies any migrations that have not been applied yet.
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -13,6 +14,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+# A line containing only GO ends a batch, as in sqlcmd. SQL Server compiles a whole batch
+# before running it, so a column added with ALTER TABLE can only be used in a later batch.
+BATCH_SEPARATOR = re.compile(r"^\s*GO\s*$", re.MULTILINE | re.IGNORECASE)
 
 log = logging.getLogger(__name__)
 _engine = None
@@ -59,7 +63,9 @@ def run_migrations(engine):
             continue
         # One transaction per migration: the file and its record succeed or fail together.
         with engine.begin() as conn:
-            conn.exec_driver_sql(path.read_text())
+            for batch in BATCH_SEPARATOR.split(path.read_text()):
+                if batch.strip():
+                    conn.exec_driver_sql(batch)
             conn.execute(
                 text("INSERT INTO schema_migrations (version) VALUES (:version)"),
                 {"version": path.name},
