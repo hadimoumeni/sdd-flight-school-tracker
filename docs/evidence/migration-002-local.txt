@@ -1,0 +1,26 @@
+Migration 002 (scheduling: add lessons.completed_at with backfill), run locally with docker compose.
+Same database volume throughout: data was created on main (migration 001 only), then the scheduling image with 002 was built and started.
+
+=== BEFORE migration 002 (2026-11-20T16:13:59Z)
+version|applied_at
+-------|----------
+001_init.sql|2026-11-20 16:13:55.4078980
+id|student_id|instructor_id|aircraft_id|start_time|end_time|status
+--|----------|-------------|-----------|----------|--------|------
+1|1|1|1|2026-11-20 10:00:00.0000000|2026-11-20 12:00:00.0000000|completed
+2|1|1|1|2026-11-21 09:00:00.0000000|2026-11-21 10:30:00.0000000|scheduled
+
+=== Startup log of the new scheduling container
+scheduling-1  | applied migration 002_add_lessons_completed_at.sql
+
+=== AFTER migration 002 (2026-11-20T16:14:28Z)
+version|applied_at
+-------|----------
+001_init.sql|2026-11-20 16:13:55.4078980
+002_add_lessons_completed_at.sql|2026-11-20 16:14:25.1110945
+id|student_id|instructor_id|aircraft_id|start_time|end_time|status|completed_at
+--|----------|-------------|-----------|----------|--------|------|------------
+1|1|1|1|2026-11-20 10:00:00.0000000|2026-11-20 12:00:00.0000000|completed|2026-11-20 12:00:00.0000000
+2|1|1|1|2026-11-21 09:00:00.0000000|2026-11-21 10:30:00.0000000|scheduled|NULL
+
+=== Restarts afterwards (16:14:29, 16:14:43) logged no 'applied migration' line; schema_migrations still has 2 rows.

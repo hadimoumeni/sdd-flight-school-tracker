@@ -40,7 +40,8 @@ def list_lessons(conn):
             text(
                 "SELECT lessons.id, lessons.student_id, students.name AS student_name, "
                 "lessons.instructor_id, instructors.name AS instructor_name, "
-                "lessons.aircraft_id, lessons.start_time, lessons.end_time, lessons.status "
+                "lessons.aircraft_id, lessons.start_time, lessons.end_time, lessons.status, "
+                "lessons.completed_at "
                 "FROM lessons "
                 "JOIN students ON students.id = lessons.student_id "
                 "JOIN instructors ON instructors.id = lessons.instructor_id "
@@ -109,7 +110,10 @@ def create_lesson(conn, student_id, instructor_id, aircraft_id, start, end):
 
 def mark_completed(conn, lesson_id):
     conn.execute(
-        text("UPDATE lessons SET status = 'completed' WHERE id = :id"),
+        text(
+            "UPDATE lessons SET status = 'completed', completed_at = SYSUTCDATETIME() "
+            "WHERE id = :id"
+        ),
         {"id": lesson_id},
     )
 
