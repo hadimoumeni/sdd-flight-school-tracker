@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 import requests
+import yaml
 
 MAINTENANCE = os.environ.get("MAINTENANCE_URL", "http://localhost:8001")
 SCHEDULING = os.environ.get("SCHEDULING_URL", "http://localhost:8002")
@@ -145,3 +146,19 @@ def test_maintenance_down_gives_a_clear_503_not_a_hang(people, aircraft_id):
     finally:
         compose("start", "maintenance")
         wait_until_healthy(MAINTENANCE)
+
+
+def test_cross_seam_responses_match_the_maintenance_openapi_document(aircraft_id):
+    """What scheduling relies on must be what maintenance's openapi.yaml promises."""
+    spec = yaml.safe_load((REPO_ROOT / "services/maintenance/openapi.yaml").read_text())
+    paths = spec["paths"]
+
+    airworthiness = requests.get(
+        f"{MAINTENANCE}/aircraft/{aircraft_id}/airworthiness", timeout=10
+    ).json()
+    assert set(airworthiness) == set(spec["components"]["schemas"]["Airworthiness"]["required"])
+
+    flight_hours = post(MAINTENANCE, f"/aircraft/{aircraft_id}/flight-hours", {"hours": 1.0})
+    documented = paths["/aircraft/{aircraft_id}/flight-hours"]["post"]["responses"]["200"]
+    schema = documented["content"]["application/json"]["schema"]
+    assert set(flight_hours.json()) == set(schema["required"])

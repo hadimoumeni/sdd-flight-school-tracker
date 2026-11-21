@@ -1,0 +1,218 @@
+openapi: 3.0.3
+info:
+  title: Scheduling service
+  version: "1.0"
+  description: >
+    Students, instructors and lessons for Flight School Ops. Owns the students,
+    instructors and lessons tables. Booking and completing a lesson call the
+    maintenance service over HTTP (MAINTENANCE_URL, 2 s timeout); if maintenance
+    does not answer, those two operations return 503.
+servers:
+  - url: http://localhost:8002
+    description: Local (docker compose)
+paths:
+  /health:
+    get:
+      summary: Health of this service and its own database (not of maintenance)
+      responses:
+        "200":
+          description: The service can read and write its database
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database cannot be reached or written
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /students:
+    get:
+      summary: List students by name
+      responses:
+        "200":
+          description: Students
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Student" }
+    post:
+      summary: Add a student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewStudent" }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /instructors:
+    get:
+      summary: List instructors by name
+      responses:
+        "200":
+          description: Instructors
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Instructor" }
+    post:
+      summary: Add an instructor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewInstructor" }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /lessons:
+    get:
+      summary: List lessons by start time, with student and instructor names
+      responses:
+        "200":
+          description: Lessons
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Lesson" }
+    post:
+      summary: Book a lesson
+      description: >
+        Calls maintenance GET /aircraft/{aircraft_id}/airworthiness first. The
+        aircraft must exist and be airworthy, and neither the instructor nor the
+        aircraft may have an overlapping scheduled lesson.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewLesson" }
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/MaintenanceUnavailable"
+  /lessons/{lesson_id}/complete:
+    post:
+      summary: Mark a scheduled lesson completed and log its hours in maintenance
+      description: >
+        Calls maintenance POST /aircraft/{aircraft_id}/flight-hours first; if
+        that fails, the lesson stays scheduled.
+      parameters:
+        - name: lesson_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, hours]
+                properties:
+                  id: { type: integer }
+                  status: { type: string, enum: [completed] }
+                  hours: { type: number, example: 2.0 }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "503":
+          $ref: "#/components/responses/MaintenanceUnavailable"
+components:
+  responses:
+    Created:
+      description: Created
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [id]
+            properties:
+              id: { type: integer }
+    BadRequest:
+      description: The request breaks a business rule (invalid email, booking conflict, grounded or unknown aircraft, lesson not scheduled)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    MaintenanceUnavailable:
+      description: Maintenance did not answer within MAINTENANCE_TIMEOUT_S, or answered with a server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: "booking conflict: instructor is already booked in that window" }
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git SHA of the deployed commit, example: 4b133c8 }
+    NewStudent:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string, maxLength: 100 }
+        email: { type: string, maxLength: 254, example: alex@example.com }
+    Student:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+    NewInstructor:
+      type: object
+      required: [name, email, certificate_number]
+      properties:
+        name: { type: string, maxLength: 100 }
+        email: { type: string, maxLength: 254 }
+        certificate_number: { type: string, maxLength: 50, example: CFI-4821 }
+    Instructor:
+      type: object
+      required: [id, name, email, certificate_number]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        certificate_number: { type: string }
+    NewLesson:
+      type: object
+      required: [student_id, instructor_id, aircraft_id, start_time, end_time]
+      properties:
+        student_id: { type: integer }
+        instructor_id: { type: integer }
+        aircraft_id: { type: integer, description: Id of an aircraft in the maintenance service }
+        start_time: { type: string, example: "2026-11-20T10:00", description: ISO 8601 local date and time }
+        end_time: { type: string, example: "2026-11-20T12:00", description: Must be after start_time }
+    Lesson:
+      type: object
+      required: [id, student_id, student_name, instructor_id, instructor_name, aircraft_id, start_time, end_time, status, completed_at]
+      properties:
+        id: { type: integer }
+        student_id: { type: integer }
+        student_name: { type: string }
+        instructor_id: { type: integer }
+        instructor_name: { type: string }
+        aircraft_id: { type: integer, description: "Plain id, no foreign key; tail number comes from maintenance" }
+        start_time: { type: string, format: date-time }
+        end_time: { type: string, format: date-time }
+        status: { type: string, enum: [scheduled, completed] }
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Added by migration 002; null until the lesson is completed
