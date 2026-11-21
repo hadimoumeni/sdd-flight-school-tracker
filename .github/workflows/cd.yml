@@ -1,0 +1,107 @@
+name: CD
+
+# Runs after CI finishes on a push to main, and deploys only if CI passed on that
+# same commit (head_sha). Pull requests never deploy.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write # push images to GHCR
+  id-token: write # OpenID Connect sign-in to Azure, no stored password
+
+# Never run two deployments at once.
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+env:
+  PREFIX: hmoumeni-ieu2024
+  REGISTRY: ghcr.io/hadimoumeni
+  SHA: ${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  deploy:
+    # Skipped until infra/setup.sh has run (it sets the AZURE_LOCATION variable).
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      vars.AZURE_LOCATION != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Push images to GHCR, tagged with the commit SHA
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for service in maintenance scheduling; do
+            image="$REGISTRY/flight-school-$service:$SHA"
+            docker build -t "$image" \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              "services/$service"
+            docker push "$image"
+          done
+
+      - name: Sign in to Azure (managed identity, OpenID Connect)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure and both services (Bicep)
+        run: |
+          az deployment group create \
+            --resource-group "rg-$PREFIX" \
+            --name "deploy-$SHA" \
+            --template-file infra/main.bicep \
+            --parameters prefix="$PREFIX" location="${{ vars.AZURE_LOCATION }}" \
+                         imageTag="$SHA" registry="$REGISTRY" \
+                         sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
+                         maintenanceDbPassword="${{ secrets.MAINTENANCE_DB_PASSWORD }}" \
+                         schedulingDbPassword="${{ secrets.SCHEDULING_DB_PASSWORD }}" \
+            --query properties.outputs -o json > outputs.json
+          echo "MAINTENANCE_URL=$(jq -r .maintenanceUrl.value outputs.json)" >> "$GITHUB_ENV"
+          echo "SCHEDULING_URL=$(jq -r .schedulingUrl.value outputs.json)" >> "$GITHUB_ENV"
+          echo "UI_URL=$(jq -r .uiUrl.value outputs.json)" >> "$GITHUB_ENV"
+          echo "STORAGE=$(jq -r .storageAccount.value outputs.json)" >> "$GITHUB_ENV"
+
+      - name: Upload the UI to the storage static website
+        run: |
+          # The deployed service URLs replace the local ones in config.js.
+          cat > ui/config.js <<EOF
+          // Written by the CD pipeline for commit $SHA.
+          window.APP_CONFIG = {
+            maintenanceUrl: "$MAINTENANCE_URL",
+            schedulingUrl: "$SCHEDULING_URL",
+          };
+          EOF
+          KEY=$(az storage account keys list --account-name "$STORAGE" --query "[0].value" -o tsv)
+          az storage blob service-properties update --account-name "$STORAGE" --account-key "$KEY" \
+            --static-website --index-document index.html -o none
+          az storage blob upload-batch --account-name "$STORAGE" --account-key "$KEY" \
+            --destination '$web' --source ui --overwrite -o none
+          echo "UI: $UI_URL"
+
+      # A cold start can take a while: the container starts, the database may be
+      # resuming from auto-pause (up to about a minute), then migrations run. Allow 6 minutes.
+      - name: Post-deploy health check
+        run: |
+          for url in "$MAINTENANCE_URL" "$SCHEDULING_URL"; do
+            for attempt in $(seq 1 36); do
+              status=$(curl -s -o /tmp/health.json -w "%{http_code}" --max-time 30 "$url/health" || true)
+              if [ "$status" = "200" ]; then
+                echo "$url/health: $(cat /tmp/health.json)"
+                continue 2
+              fi
+              echo "$url/health: $status (attempt $attempt/36)"
+              sleep 10
+            done
+            echo "::error::$url/health did not return 200 within 6 minutes"
+            exit 1
+          done
