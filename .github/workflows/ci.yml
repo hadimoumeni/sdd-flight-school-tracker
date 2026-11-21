@@ -41,6 +41,24 @@ jobs:
       - name: Unit tests with coverage
         run: pytest
 
+  # The OpenAPI documents are part of the graded system description, so a broken
+  # document fails the pipeline like a failing test.
+  validate:
+    name: validate OpenAPI documents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validator
+        run: pip install openapi-spec-validator==0.9.0
+
+      - name: Validate each openapi.yaml against the OpenAPI specification
+        run: openapi-spec-validator services/maintenance/openapi.yaml services/scheduling/openapi.yaml
+
   build:
     name: build ${{ matrix.service }} image
     runs-on: ubuntu-latest

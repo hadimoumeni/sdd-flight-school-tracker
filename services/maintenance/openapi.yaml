@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: Maintenance service
+  version: "1.0"
+  description: >
+    Aircraft, squawks and airworthiness for Flight School Ops. Owns the aircraft
+    and squawks tables. Scheduling calls GET /aircraft/{aircraft_id}/airworthiness
+    and POST /aircraft/{aircraft_id}/flight-hours across the seam.
+servers:
+  - url: http://localhost:8001
+    description: Local (docker compose)
+paths:
+  /health:
+    get:
+      summary: Health of this service and its own database
+      responses:
+        "200":
+          description: The service can read and write its database
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database cannot be reached or written
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /aircraft:
+    get:
+      summary: List all aircraft with their current airworthiness
+      responses:
+        "200":
+          description: Aircraft ordered by tail number
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Aircraft" }
+    post:
+      summary: Add an aircraft (0 hours, inspection at 0)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewAircraft" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Created" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The tail number already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /aircraft/{aircraft_id}/airworthiness:
+    get:
+      summary: Whether one aircraft may fly (called by scheduling before booking)
+      parameters:
+        - $ref: "#/components/parameters/AircraftId"
+      responses:
+        "200":
+          description: Airworthiness of the aircraft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Airworthiness" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /aircraft/{aircraft_id}/flight-hours:
+    post:
+      summary: Add flown hours to an aircraft (called by scheduling when a lesson is completed)
+      parameters:
+        - $ref: "#/components/parameters/AircraftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [hours]
+              properties:
+                hours: { type: number, exclusiveMinimum: true, minimum: 0, example: 2.5 }
+      responses:
+        "200":
+          description: Hours added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [aircraft_id, added_hours]
+                properties:
+                  aircraft_id: { type: integer }
+                  added_hours: { type: number }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /squawks:
+    get:
+      summary: List open (unresolved) squawks, oldest first
+      responses:
+        "200":
+          description: Open squawks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Squawk" }
+    post:
+      summary: Report a squawk on an aircraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewSquawk" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Created" }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /squawks/{squawk_id}/resolve:
+    post:
+      summary: Resolve an open squawk
+      parameters:
+        - name: squawk_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, resolved]
+                properties:
+                  id: { type: integer }
+                  resolved: { type: boolean }
+        "404":
+          description: There is no open squawk with that id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  parameters:
+    AircraftId:
+      name: aircraft_id
+      in: path
+      required: true
+      schema: { type: integer }
+  responses:
+    BadRequest:
+      description: The request breaks a business rule
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: The aircraft does not exist
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: aircraft not found }
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git SHA of the deployed commit, example: 4b133c8 }
+    Created:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+    NewAircraft:
+      type: object
+      required: [tail_number, model]
+      properties:
+        tail_number: { type: string, maxLength: 20, example: N12345 }
+        model: { type: string, maxLength: 100, example: Cessna 172 }
+    Aircraft:
+      type: object
+      required: [id, tail_number, model, total_hours, hours_at_last_inspection, airworthy, reason]
+      properties:
+        id: { type: integer }
+        tail_number: { type: string }
+        model: { type: string }
+        total_hours: { type: number }
+        hours_at_last_inspection: { type: number }
+        airworthy: { type: boolean }
+        reason:
+          type: string
+          nullable: true
+          description: Why the aircraft is grounded; null when airworthy
+    Airworthiness:
+      type: object
+      required: [aircraft_id, airworthy, reason]
+      properties:
+        aircraft_id: { type: integer }
+        airworthy: { type: boolean }
+        reason:
+          type: string
+          nullable: true
+          example: "grounded: open safety squawk - Left brake not holding"
+    NewSquawk:
+      type: object
+      required: [aircraft_id, description, severity]
+      properties:
+        aircraft_id: { type: integer }
+        description: { type: string, maxLength: 500 }
+        severity: { type: string, enum: [minor, safety] }
+    Squawk:
+      type: object
+      required: [id, aircraft_id, tail_number, description, severity, reported_at]
+      properties:
+        id: { type: integer }
+        aircraft_id: { type: integer }
+        tail_number: { type: string }
+        description: { type: string }
+        severity: { type: string, enum: [minor, safety] }
+        reported_at: { type: string, format: date-time }
