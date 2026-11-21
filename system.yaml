@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=./system.schema.json
+student: hmoumeni.ieu2024
+prefix: hmoumeni-ieu2024
+# Not deployed yet: the Azure for Students subscription is disabled (see README).
+# The storage endpoint's zone (z<N>) is only known after the first deploy, so this
+# is updated from the CD output then.
+public_url: https://hmoumeniieu2024ui.zN.web.core.windows.net
+ui:
+  path: ui
+  storage_account: hmoumeniieu2024ui
+  calls: [scheduling, maintenance]
+azure:
+  resource_group: rg-hmoumeni-ieu2024
+  container_apps_environment: hmoumeni-ieu2024-env
+  sql_server: hmoumeni-ieu2024-sql
+  registry: ghcr.io/hadimoumeni
+services:
+  maintenance:
+    description: Aircraft, squawks and airworthiness (100-hour inspection rule, open safety squawks).
+    path: services/maintenance
+    openapi: services/maintenance/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/maintenance/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: Connection string of the maintenance database }
+      CORS_ORIGIN: { default: "http://localhost:8080", description: The only browser origin allowed to call the service (the UI) }
+      GIT_SHA: { default: dev, description: Version reported by /health (the deployed commit SHA) }
+    calls: []
+    azure:
+      container_app: hmoumeni-ieu2024-maintenance
+      sql_database: hmoumeni-ieu2024-maintenance-db
+  scheduling:
+    description: Students, instructors and lesson booking, with conflict detection.
+    path: services/scheduling
+    openapi: services/scheduling/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/scheduling/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: Connection string of the scheduling database }
+      CORS_ORIGIN: { default: "http://localhost:8080", description: The only browser origin allowed to call the service (the UI) }
+      GIT_SHA: { default: dev, description: Version reported by /health (the deployed commit SHA) }
+      MAINTENANCE_URL: { default: "http://maintenance:8000", description: Base URL of the maintenance service }
+      MAINTENANCE_TIMEOUT_S: { default: 2, description: Timeout in seconds for calls to maintenance }
+    calls:
+      - service: maintenance
+        url_env: MAINTENANCE_URL
+        endpoints: ["GET /aircraft/{aircraft_id}/airworthiness", "POST /aircraft/{aircraft_id}/flight-hours"]
+        timeout_s: 2
+        on_failure: Booking and completing a lesson return 503 with "maintenance service is unavailable"; students, instructors and lessons keep working, and the UI shows lessons with "aircraft #N" instead of tail numbers.
+    azure:
+      container_app: hmoumeni-ieu2024-scheduling
+      sql_database: hmoumeni-ieu2024-scheduling-db
