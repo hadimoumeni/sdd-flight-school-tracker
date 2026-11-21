@@ -74,6 +74,57 @@ pytest                        # fails under 70% coverage
 Coverage is measured on the business rules (`logic.py`) and, for scheduling,
 the HTTP client to maintenance (`maintenance_client.py`).
 
+## Deployment to Azure
+
+Live URL: **not deployed yet** (see the note at the end of this section).
+
+Every push to `main` runs CI; when CI passes on that commit, `.github/workflows/cd.yml`:
+
+1. builds both images and pushes them to GHCR tagged with the commit SHA
+   (`ghcr.io/hadimoumeni/flight-school-<service>:<sha>`);
+2. signs in to Azure as the managed identity `hmoumeni-ieu2024-github` through
+   OpenID Connect (no Azure password stored anywhere);
+3. deploys `infra/main.bicep` to `rg-hmoumeni-ieu2024`: Log Analytics, the Container
+   Apps environment, both Container Apps (0 to 1 replicas), the SQL server with
+   one serverless database per service (free offer) and the UI storage account;
+4. writes `ui/config.js` with the deployed service URLs and uploads `ui/` to the
+   storage account's `$web` container (static website);
+5. calls `/health` on both services and fails the run if they do not return 200
+   within 6 minutes (enough for a cold start plus a database resuming from pause).
+
+| Resource | Name |
+|---|---|
+| Resource group | `rg-hmoumeni-ieu2024` |
+| Container Apps environment | `hmoumeni-ieu2024-env` |
+| Container Apps | `hmoumeni-ieu2024-maintenance`, `hmoumeni-ieu2024-scheduling` |
+| SQL server / databases | `hmoumeni-ieu2024-sql` / `hmoumeni-ieu2024-maintenance-db`, `hmoumeni-ieu2024-scheduling-db` |
+| UI storage account | `hmoumeniieu2024ui` |
+| Pipeline identity | `hmoumeni-ieu2024-github` |
+| Logs | `hmoumeni-ieu2024-logs` |
+
+### Initial setup (once)
+
+```
+az login            # IE account, Azure for Students subscription
+gh auth login
+AZURE_LOCATION=<an allowed region> PROFESSOR_EMAIL=<email> ./infra/setup.sh
+```
+
+`infra/setup.sh` creates the resource group, the managed identity (Contributor on
+the resource group only, trusted only for `main` of this repository), the SQL
+server and databases, one login per service, and the GitHub secrets
+(`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
+`SQL_ADMIN_PASSWORD`, `MAINTENANCE_DB_PASSWORD`, `SCHEDULING_DB_PASSWORD`) and
+the `AZURE_LOCATION` variable. CD is skipped until that variable exists. After
+the first CD run, make the two GHCR packages public (GitHub → Packages →
+Package settings → Change visibility) so Container Apps can pull them.
+
+**Status (21 Nov):** my Azure for Students subscription shows as *Disabled* and
+the portal says it cannot be reactivated. I opened an Azure support ticket and
+told the professor. Everything above is written and checked locally
+(`az bicep build` passes with no warnings); it runs as soon as a subscription is
+available.
+
 ## Environment variables
 
 | Variable | Service | Default | Purpose |
