@@ -17,6 +17,9 @@ param prefix string
 
 param location string = resourceGroup().location
 
+@description('Region of the SQL server: the free offer is not available everywhere')
+param sqlLocation string = location
+
 @description('Image tag to deploy: the commit SHA')
 param imageTag string
 
@@ -64,7 +67,7 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
 
 resource sql 'Microsoft.Sql/servers@2023-08-01-preview' = {
   name: '${prefix}-sql'
-  location: location
+  location: sqlLocation
   properties: {
     administratorLogin: sqlAdminLogin
     administratorLoginPassword: sqlAdminPassword
@@ -90,7 +93,7 @@ resource databases 'Microsoft.Sql/servers/databases@2023-08-01-preview' = [
   for service in ['maintenance', 'scheduling']: {
     parent: sql
     name: '${prefix}-${service}-db'
-    location: location
+    location: sqlLocation
     sku: {
       name: 'GP_S_Gen5'
       tier: 'GeneralPurpose'

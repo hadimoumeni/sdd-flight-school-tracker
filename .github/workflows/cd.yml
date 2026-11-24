@@ -41,7 +41,9 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           for service in maintenance scheduling; do
             image="$REGISTRY/flight-school-$service:$SHA"
-            docker build -t "$image" \
+            # provenance=false: a single-platform image Container Apps can pull, not a
+            # manifest list with an attestation (which makes the pull fail).
+            docker build --provenance=false -t "$image" \
               --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
               "services/$service"
             docker push "$image"
@@ -61,6 +63,7 @@ jobs:
             --name "deploy-$SHA" \
             --template-file infra/main.bicep \
             --parameters prefix="$PREFIX" location="${{ vars.AZURE_LOCATION }}" \
+                         sqlLocation="${{ vars.SQL_LOCATION || vars.AZURE_LOCATION }}" \
                          imageTag="$SHA" registry="$REGISTRY" \
                          sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
                          maintenanceDbPassword="${{ secrets.MAINTENANCE_DB_PASSWORD }}" \
