@@ -104,26 +104,55 @@ Every push to `main` runs CI; when CI passes on that commit, `.github/workflows/
 
 ### Initial setup (once)
 
-```
-az login            # IE account, Azure for Students subscription
-gh auth login
-AZURE_LOCATION=<an allowed region> PROFESSOR_EMAIL=<email> ./infra/setup.sh
-```
+Run once with my own account (`az login` with the IE account, `gh auth login`),
+in Bash. `infra/setup.sh` contains exactly these steps and can be run as
+`AZURE_LOCATION=<region> [SQL_LOCATION=<region>] ./infra/setup.sh`.
+No password is ever written to a file: they are generated in the script and go
+straight into GitHub secrets.
 
-`infra/setup.sh` creates the resource group, the managed identity (Contributor on
-the resource group only, trusted only for `main` of this repository), the SQL
-server and databases, one login per service, and the GitHub secrets
-(`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`,
-`SQL_ADMIN_PASSWORD`, `MAINTENANCE_DB_PASSWORD`, `SCHEDULING_DB_PASSWORD`) and
-the `AZURE_LOCATION` variable. CD is skipped until that variable exists. After
-the first CD run, make the two GHCR packages public (GitHub → Packages →
-Package settings → Change visibility) so Container Apps can pull them.
+1. **Region.** Pick one from the subscription's allowed list
+   (`az policy assignment list`, policy "Allowed resource deployment regions").
+   The free SQL offer is not in every region, so the SQL server can use another
+   one from the list (`SQL_LOCATION`).
+2. **Providers and resource group.**
+   `az provider register --namespace <ns> --wait` for `Microsoft.App`,
+   `Microsoft.OperationalInsights`, `Microsoft.Sql`, `Microsoft.Storage`,
+   `Microsoft.ManagedIdentity`; then `az group create --name rg-hmoumeni-ieu2024`.
+3. **Pipeline identity.** `az identity create --name hmoumeni-ieu2024-github`;
+   `az role assignment create --role Contributor --scope <resource group id>`;
+   `az identity federated-credential create` for
+   `repo:hadimoumeni/sdd-flight-school-tracker:ref:refs/heads/main` and for the
+   numeric-id form of the same subject (issuer
+   `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`).
+4. **SQL server and databases.** `az sql server create --name hmoumeni-ieu2024-sql`;
+   firewall rule `0.0.0.0`–`0.0.0.0` (allow Azure services); `az sql db create` for
+   `hmoumeni-ieu2024-maintenance-db` and `hmoumeni-ieu2024-scheduling-db` with
+   `--edition GeneralPurpose --compute-model Serverless --family Gen5 --capacity 1
+   --min-capacity 0.5 --use-free-limit --free-limit-exhaustion-behavior AutoPause
+   --backup-storage-redundancy Local`.
+5. **Database users.** Open the firewall to my IP, then in each database with
+   `sqlcmd` (from the SQL Server Docker image): `CREATE USER <service>_user WITH
+   PASSWORD = ...` (a contained user, so it cannot reach the other database) and
+   add it to `db_ddladmin`, `db_datareader`, `db_datawriter`. Close the firewall again.
+6. **GitHub secrets and variables.** `gh secret set` for `AZURE_CLIENT_ID`,
+   `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `SQL_ADMIN_PASSWORD`,
+   `MAINTENANCE_DB_PASSWORD`, `SCHEDULING_DB_PASSWORD`; `gh variable set` for
+   `AZURE_LOCATION`, `SQL_LOCATION`, `PREFIX`, `RESOURCE_GROUP`, `UI_STORAGE`.
+   CD is skipped until `AZURE_LOCATION` exists.
+7. **Read access for grading.** `az role assignment create --role Reader` on the
+   resource group for amartini@faculty.ie.edu and bserra@faculty.ie.edu.
 
-**Status (21 Nov):** my Azure for Students subscription shows as *Disabled* and
-the portal says it cannot be reactivated. I opened an Azure support ticket and
-told the professor. Everything above is written and checked locally
-(`az bicep build` passes with no warnings); it runs as soon as a subscription is
-available.
+Everything else (Container Apps environment and apps, Log Analytics, storage
+account and its static website) is created by the first CD run from
+`infra/main.bicep`. That first run is expected to fail to pull the images, because
+new GHCR packages are private: make both packages public in their GitHub settings
+and re-run the job.
+
+**Status:** not deployed. When I started the Azure setup on 21 November, my Azure
+for Students subscription was *Disabled*, and the portal says it cannot be
+reactivated ("Please contact Azure Support"). Everything above is written and
+checked in CI (the Bicep compiles, `shellcheck` passes on the setup script); it
+runs as soon as a working subscription is available.
 
 ## Environment variables
 
