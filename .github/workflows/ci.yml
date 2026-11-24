@@ -62,6 +62,20 @@ jobs:
       - name: Validate each openapi.yaml against the OpenAPI specification
         run: openapi-spec-validator services/maintenance/openapi.yaml services/scheduling/openapi.yaml
 
+  # The deployment files are code too: a Bicep that does not compile or a setup script
+  # with a shell mistake would only show up when deploying, so check them on every push.
+  infra:
+    name: check infrastructure files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile the Bicep (fails on errors)
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+      - name: Lint the setup script
+        run: shellcheck infra/setup.sh
+
   build:
     name: build ${{ matrix.service }} image
     runs-on: ubuntu-latest
