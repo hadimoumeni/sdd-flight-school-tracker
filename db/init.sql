@@ -15,13 +15,18 @@ IF SUSER_ID('scheduling_user') IS NULL
     WITH PASSWORD = '$(SCHEDULING_DB_PASSWORD)', DEFAULT_DATABASE = scheduling;
 GO
 
--- db_owner on its own database only, so the service can run its migrations.
+-- Only what the service needs on its own database: create and change tables (migrations),
+-- read and write rows. Same roles as the contained users on Azure (see infra/setup.sh).
 USE maintenance;
 IF USER_ID('maintenance_user') IS NULL CREATE USER maintenance_user FOR LOGIN maintenance_user;
-ALTER ROLE db_owner ADD MEMBER maintenance_user;
+ALTER ROLE db_ddladmin ADD MEMBER maintenance_user;
+ALTER ROLE db_datareader ADD MEMBER maintenance_user;
+ALTER ROLE db_datawriter ADD MEMBER maintenance_user;
 GO
 
 USE scheduling;
 IF USER_ID('scheduling_user') IS NULL CREATE USER scheduling_user FOR LOGIN scheduling_user;
-ALTER ROLE db_owner ADD MEMBER scheduling_user;
+ALTER ROLE db_ddladmin ADD MEMBER scheduling_user;
+ALTER ROLE db_datareader ADD MEMBER scheduling_user;
+ALTER ROLE db_datawriter ADD MEMBER scheduling_user;
 GO
